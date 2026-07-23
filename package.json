@@ -1,0 +1,23 @@
+{
+  "name": "verse-ai-protocol",
+  "version": "1.0.0",
+  "description": "A comprehensive DeFi staking protocol with AI-driven strategy management",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:gas": "REPORT_GAS=true hardhat test",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:base": "hardhat run scripts/deploy.js --network base",
+    "deploy:arbitrum": "hardhat run scripts/deploy.js --network arbitrum",
+    "lint": "solhint contracts/**/*.sol"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0",
+    "hardhat-gas-reporter": "^1.0.0",
+    "dotenv": "^16.3.0"
+  }
+}
