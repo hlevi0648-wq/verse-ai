@@ -4,14 +4,13 @@ const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("OracleManager", function () {
   let oracleManager, mockAggregator, owner, addr1, addr2;
-  const STALE_DELAY = 3600; // 1 hour
+  const STALE_DELAY = 3600;
 
   beforeEach(async function () {
     [owner, addr1, addr2] = await ethers.getSigners();
 
-    // Deploy a mock Chainlink aggregator
     const MockAggregator = await ethers.getContractFactory("MockAggregatorV3");
-    mockAggregator = await MockAggregator.deploy(8, 200000000000); // 8 decimals, $2000
+    mockAggregator = await MockAggregator.deploy(8, 200000000000);
     await mockAggregator.waitForDeployment();
 
     const OracleManager = await ethers.getContractFactory("OracleManager");
@@ -31,7 +30,7 @@ describe("OracleManager", function () {
     await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), 0);
     const pairHash = ethers.solidityKeccak256(["address", "address"], [addr1.address, addr2.address]);
     const feed = await oracleManager.priceFeeds(pairHash);
-    expect(feed.stalePriceDelay).to.equal(3600); // DEFAULT_STALE_DELAY
+    expect(feed.stalePriceDelay).to.equal(3600);
   });
 
   it("should revert adding feed with zero address", async function () {
@@ -60,16 +59,59 @@ describe("OracleManager", function () {
     ).to.be.revertedWith("Price feed not found");
   });
 
-  it("should revert price for reversed pair (no bidirectional lookup)", async function () {
+  it("should support bidirectional pair lookup", async function () {
     await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
+    // Reverse order should now work
+    const [price, timestamp, isStale] = await oracleManager.getPrice(addr2.address, addr1.address);
+    expect(price).to.equal(200000000000);
+    expect(isStale).to.be.false;
+  });
+
+  it("should store reverse pair hash", async function () {
+    await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
+    const pairHash = ethers.solidityKeccak256(["address", "address"], [addr1.address, addr2.address]);
+    const reverseHash = ethers.solidityKeccak256(["address", "address"], [addr2.address, addr1.address]);
+    expect(await oracleManager.reversePairHash(pairHash)).to.equal(reverseHash);
+    expect(await oracleManager.reversePairHash(reverseHash)).to.equal(pairHash);
+  });
+
+  it("should allow admin to deactivate a price feed", async function () {
+    await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
+    await oracleManager.deactivatePriceFeed(addr1.address, addr2.address);
+    // Forward direction should be inactive
+    await expect(
+      oracleManager.getPrice(addr1.address, addr2.address)
+    ).to.be.revertedWith("Price feed inactive");
+    // Reverse direction should also be inactive
     await expect(
       oracleManager.getPrice(addr2.address, addr1.address)
+    ).to.be.revertedWith("Price feed inactive");
+  });
+
+  it("should emit PriceFeedDeactivated event", async function () {
+    await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
+    const pairHash = ethers.solidityKeccak256(["address", "address"], [addr1.address, addr2.address]);
+    await expect(oracleManager.deactivatePriceFeed(addr1.address, addr2.address))
+      .to.emit(oracleManager, "PriceFeedDeactivated")
+      .withArgs(pairHash);
+  });
+
+  it("should revert deactivation of non-existent feed", async function () {
+    await expect(
+      oracleManager.deactivatePriceFeed(addr1.address, addr2.address)
     ).to.be.revertedWith("Price feed not found");
   });
 
   it("should revert non-admin adding feed", async function () {
     await expect(
       oracleManager.connect(addr1).addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY)
+    ).to.be.revertedWithCustomError(oracleManager, "AccessControlUnauthorizedAccount");
+  });
+
+  it("should revert non-admin deactivating feed", async function () {
+    await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
+    await expect(
+      oracleManager.connect(addr1).deactivatePriceFeed(addr1.address, addr2.address)
     ).to.be.revertedWithCustomError(oracleManager, "AccessControlUnauthorizedAccount");
   });
 
