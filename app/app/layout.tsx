@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@rainbow-me/rainbowkit/styles.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Web3Provider } from "./providers/Web3Provider";
 import Navbar from "./components/Navbar";
 
 export const metadata: Metadata = {
@@ -12,9 +14,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className="antialiased">
-        <Navbar />
-        <main>{children}</main>
-        <SpeedInsights />
+        <Web3Provider>
+          <Navbar />
+          <main>{children}</main>
+          <SpeedInsights />
+        </Web3Provider>
       </body>
     </html>
   );
