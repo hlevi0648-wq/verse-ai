@@ -4,7 +4,7 @@ import { sepolia } from "wagmi/chains";
 import { injected, walletConnect } from "wagmi/connectors";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const projectId = "demo-project-id";
+const projectId = "verse-ai-walletconnect";
 
 const config = createConfig({
   chains: [sepolia],
