@@ -1,8 +1,7 @@
 "use client";
 import { useState } from "react";
-import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt, useConnect } from "wagmi";
 import { parseEther, formatEther } from "viem";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 const VAULT = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 const ABI = [
@@ -17,6 +16,7 @@ export default function Stake() {
   const [amount, setAmount] = useState("");
   const [tab, setTab] = useState<"stake" | "unstake">("stake");
   const { address, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
 
   const { data: stakedBalance } = useReadContract({ address: VAULT, abi: ABI, functionName: "stakedBalanceOf", args: address ? [address] : undefined });
   const { data: earnedRewards } = useReadContract({ address: VAULT, abi: ABI, functionName: "earnedRewards", args: address ? [address] : undefined });
@@ -37,7 +37,10 @@ export default function Stake() {
       {!isConnected ? (
         <div className="rounded-xl border border-gray-800 p-10 bg-gray-950 text-center mb-6">
           <p className="text-gray-400 mb-6">Connect your wallet to start staking</p>
-          <div className="flex justify-center"><ConnectButton /></div>
+          <button onClick={() => connect({ connector: connectors[0] })}
+            className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-6 py-3 rounded-lg transition">
+            Connect Wallet
+          </button>
         </div>
       ) : (
         <>

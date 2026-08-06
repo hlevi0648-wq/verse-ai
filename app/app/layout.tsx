@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "@rainbow-me/rainbowkit/styles.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Web3Provider } from "./providers/Web3Provider";
 import Navbar from "./components/Navbar";
