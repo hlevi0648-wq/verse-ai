@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
@@ -15,6 +16,13 @@ export default function Navbar() {
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
+  const [showWallets, setShowWallets] = useState(false);
+
+  const walletOptions = [
+    { connector: connectors.find((c) => c.id === "metaMask" || c.name === "MetaMask"), name: "MetaMask", icon: "🦊", desc: "Browser extension" },
+    { connector: connectors.find((c) => c.id === "trustWallet" || c.name === "Trust Wallet"), name: "Trust Wallet", icon: "🛡️", desc: "Mobile & browser" },
+    { connector: connectors.find((c) => c.id === "walletConnect" || c.name === "WalletConnect"), name: "WalletConnect", icon: "🔗", desc: "Scan QR code" },
+  ].filter((w) => w.connector);
 
   return (
     <nav className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-50">
@@ -41,10 +49,34 @@ export default function Navbar() {
             </button>
           </div>
         ) : (
-          <button onClick={() => connect({ connector: connectors[0] })}
-            className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
-            Connect Wallet
-          </button>
+          <div className="relative">
+            <button onClick={() => setShowWallets(!showWallets)}
+              className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+              Connect Wallet
+            </button>
+            {showWallets && (
+              <div className="absolute right-0 top-12 w-72 rounded-xl border border-gray-700 bg-gray-900 shadow-2xl overflow-hidden z-50">
+                <div className="px-4 py-3 border-b border-gray-800">
+                  <p className="text-sm font-semibold">Connect Wallet</p>
+                  <p className="text-xs text-gray-500">Choose your preferred wallet</p>
+                </div>
+                {walletOptions.map((w) => (
+                  <button key={w.name}
+                    onClick={() => { connect({ connector: w.connector! }); setShowWallets(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition text-left">
+                    <span className="text-2xl">{w.icon}</span>
+                    <div>
+                      <p className="text-sm font-medium">{w.name}</p>
+                      <p className="text-xs text-gray-500">{w.desc}</p>
+                    </div>
+                  </button>
+                ))}
+                <div className="px-4 py-2 border-t border-gray-800">
+                  <p className="text-xs text-gray-600 text-center">By connecting, you agree to the Terms of Service</p>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </nav>
