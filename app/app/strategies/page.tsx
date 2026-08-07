@@ -1,61 +1,161 @@
+"use client";
+import { useState, useEffect } from "react";
+import { useAccount } from "wagmi";
+
+interface PriceData {
+  token: string;
+  name: string;
+  price_usd: number;
+  change_24h: number;
+  volume_24h: number;
+  market_cap: number;
+}
+
+interface Analytics {
+  total_tvl: number;
+  total_staked: number;
+  total_rewards: number;
+  verse_price: number;
+  eth_price: number;
+  avg_apy: number;
+  risk_score: number;
+  sharpe_ratio: number;
+  strategies_count: number;
+}
+
+interface Recommendation {
+  strategy_name: string;
+  action: string;
+  allocation_percent: number;
+  reason: string;
+  confidence: number;
+}
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function Strategies() {
-  const strategies = [
-    { name: "Conservative Yield", apy: "8.2%", risk: "Low", riskColor: "text-green-400", tvl: "$4.1M",
-      description: "Stablecoin pools with minimal impermanent loss. Ideal for risk-averse depositors.",
-      allocations: ["USDC/DAI — 60%", "VERSE/USDC — 40%"], aiRebalance: "Weekly" },
-    { name: "Balanced Growth", apy: "18.7%", risk: "Medium", riskColor: "text-yellow-400", tvl: "$5.8M",
-      description: "Diversified across blue-chip DeFi with AI-driven rebalancing for optimal yield.",
-      allocations: ["VERSE/ETH — 40%", "USDC/ETH — 30%", "Staking — 30%"], aiRebalance: "Daily" },
-    { name: "Aggressive Alpha", apy: "22.1%", risk: "High", riskColor: "text-red-400", tvl: "$2.5M",
-      description: "High-yield pools with frequent AI rebalancing. Higher risk, higher reward.",
-      allocations: ["VERSE/ETH — 60%", "Long-tail pairs — 30%", "Leverage — 10%"], aiRebalance: "Hourly" },
-  ];
+  const { isConnected } = useAccount();
+  const [prices, setPrices] = useState<PriceData[]>([]);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetch() {
+      try {
+        const [pRes, aRes, rRes] = await Promise.all([
+          fetch(`${API}/api/v1/prices`),
+          fetch(`${API}/api/v1/analytics`),
+          fetch(`${API}/api/v1/recommendations?risk_tolerance=medium`),
+        ]);
+        if (pRes.ok) setPrices(await pRes.json());
+        if (aRes.ok) setAnalytics(await aRes.json());
+        if (rRes.ok) setRecommendations(await rRes.json());
+      } catch (e) {
+        console.error("API fetch error:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetch();
+    const interval = setInterval(fetch, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-800 rounded w-1/4" />
+          <div className="h-64 bg-gray-800 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
       <h1 className="text-3xl font-bold mb-2">AI Strategies</h1>
-      <p className="text-gray-400 mb-8">Choose an AI-managed strategy that matches your risk appetite.</p>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {strategies.map((s, i) => (
-          <div key={i} className="rounded-xl border border-gray-800 bg-gray-950 overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">{s.name}</h2>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full bg-gray-800 ${s.riskColor}`}>{s.risk} Risk</span>
-              </div>
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className="text-3xl font-bold">{s.apy}</span>
-                <span className="text-sm text-gray-400">APY</span>
-              </div>
-              <p className="text-sm text-gray-400 mb-5">{s.description}</p>
-              <div className="space-y-2 mb-5">
-                <div className="flex justify-between text-sm"><span className="text-gray-500">TVL</span><span className="font-medium">{s.tvl}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-gray-500">AI Rebalance</span><span className="font-medium">{s.aiRebalance}</span></div>
-              </div>
-              <div className="border-t border-gray-800 pt-4">
-                <p className="text-xs text-gray-500 mb-2">Allocations</p>
-                {s.allocations.map((a, j) => <p key={j} className="text-xs text-gray-300">{a}</p>)}
-              </div>
-            </div>
-            <button className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-sm font-medium transition border-t border-gray-800">Allocate to Strategy</button>
+      <p className="text-gray-400 mb-8">Real-time market data and AI-powered portfolio recommendations.</p>
+
+      {analytics && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="rounded-xl border border-gray-800 p-4 bg-gray-950">
+            <p className="text-xs text-gray-500">ETH Price</p>
+            <p className="text-lg font-bold">${analytics.eth_price?.toLocaleString(undefined, {maximumFractionDigits: 2}) || "—"}</p>
           </div>
-        ))}
-      </div>
-      <div className="mt-10 rounded-xl border border-gray-800 p-6 bg-gray-950">
-        <h2 className="text-lg font-semibold mb-4">🧠 AI Risk Assessment</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            { label: "Market Volatility", pct: 35, color: "bg-yellow-500", level: "Low" },
-            { label: "Smart Contract Risk", pct: 15, color: "bg-green-500", level: "Minimal" },
-            { label: "Liquidity Risk", pct: 20, color: "bg-green-500", level: "Low" },
-          ].map((r, i) => (
-            <div key={i}>
-              <p className="text-sm text-gray-400 mb-1">{r.label}</p>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-                  <div className={`h-full ${r.color} rounded-full`} style={{ width: `${r.pct}%` }} />
+          <div className="rounded-xl border border-gray-800 p-4 bg-gray-950">
+            <p className="text-xs text-gray-500">Avg APY</p>
+            <p className="text-lg font-bold text-green-400">{analytics.avg_apy?.toFixed(1)}%</p>
+          </div>
+          <div className="rounded-xl border border-gray-800 p-4 bg-gray-950">
+            <p className="text-xs text-gray-500">Sharpe Ratio</p>
+            <p className="text-lg font-bold">{analytics.sharpe_ratio?.toFixed(2)}</p>
+          </div>
+          <div className="rounded-xl border border-gray-800 p-4 bg-gray-950">
+            <p className="text-xs text-gray-500">Risk Score</p>
+            <p className="text-lg font-bold">{analytics.risk_score?.toFixed(0)}/100</p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="rounded-xl border border-gray-800 p-6 bg-gray-950">
+          <h2 className="text-lg font-semibold mb-4">Live Prices</h2>
+          <div className="space-y-3">
+            {prices.map((p) => (
+              <div key={p.token} className="flex items-center justify-between">
+                <div>
+                  <span className="font-medium">{p.token}</span>
+                  <span className="text-xs text-gray-500 ml-2">{p.name}</span>
                 </div>
-                <span className="text-sm font-medium">{r.level}</span>
+                <div className="text-right">
+                  <span className="font-mono">${p.price_usd?.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
+                  <span className={`ml-2 text-xs ${p.change_24h >= 0 ? "text-green-400" : "text-red-400"}`}>
+                    {p.change_24h >= 0 ? "▲" : "▼"} {Math.abs(p.change_24h).toFixed(1)}%
+                  </span>
+                </div>
               </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-800 p-6 bg-gray-950">
+          <h2 className="text-lg font-semibold mb-4">AI Recommendations</h2>
+          {recommendations.length === 0 ? (
+            <p className="text-gray-500 text-sm">No strategies deployed yet. Deploy contracts to get recommendations.</p>
+          ) : (
+            <div className="space-y-3">
+              {recommendations.map((r) => (
+                <div key={r.strategy_name} className="flex items-center justify-between p-3 rounded-lg bg-gray-900">
+                  <div>
+                    <p className="text-sm font-medium">{r.strategy_name}</p>
+                    <p className="text-xs text-gray-500">{r.reason}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-xs font-medium px-2 py-1 rounded ${
+                      r.action === "increase" ? "bg-green-900 text-green-300" :
+                      r.action === "reduce" ? "bg-red-900 text-red-300" :
+                      "bg-gray-700 text-gray-300"
+                    }`}>{r.action.toUpperCase()}</span>
+                    <p className="text-xs text-gray-500 mt-1">{r.allocation_percent.toFixed(1)}%</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-800 p-6 bg-gray-950">
+        <h2 className="text-lg font-semibold mb-4">Chainlink Oracle Prices</h2>
+        <p className="text-xs text-gray-500 mb-3">On-chain price feeds from Chainlink oracles (Sepolia)</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {["ETH/USD", "BTC/USD", "LINK/USD", "USDC/USD"].map((pair) => (
+            <div key={pair} className="rounded-lg bg-gray-900 p-3">
+              <p className="text-xs text-gray-500">{pair}</p>
+              <p className="text-sm font-mono font-medium">—</p>
+              <p className="text-xs text-gray-600">On-chain</p>
             </div>
           ))}
         </div>
