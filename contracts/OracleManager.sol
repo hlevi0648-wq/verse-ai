@@ -27,6 +27,7 @@ contract OracleManager is AccessControl {
     }
 
     mapping(bytes32 => PriceFeed) public priceFeeds;
+    mapping(bytes32 => bytes32) public reversePairHash;
     uint256 public constant DEFAULT_STALE_DELAY = 1 hours;
 
     event PriceFeedAdded(
@@ -54,12 +55,22 @@ contract OracleManager is AccessControl {
     ) external onlyRole(ORACLE_ADMIN_ROLE) {
         require(feedAddress != address(0), "Invalid feed address");
         bytes32 pairHash = keccak256(abi.encodePacked(token0, token1));
+        bytes32 reverseHash = keccak256(abi.encodePacked(token1, token0));
 
         priceFeeds[pairHash] = PriceFeed({
             feedAddress: feedAddress,
             stalePriceDelay: staleDelay > 0 ? staleDelay : DEFAULT_STALE_DELAY,
             isActive: true
         });
+
+        priceFeeds[reverseHash] = PriceFeed({
+            feedAddress: feedAddress,
+            stalePriceDelay: staleDelay > 0 ? staleDelay : DEFAULT_STALE_DELAY,
+            isActive: true
+        });
+
+        reversePairHash[pairHash] = reverseHash;
+        reversePairHash[reverseHash] = pairHash;
 
         emit PriceFeedAdded(pairHash, feedAddress, staleDelay);
     }
@@ -84,5 +95,22 @@ contract OracleManager is AccessControl {
         bool stale = (currentTime - updatedAt) > feed.stalePriceDelay;
 
         return (uint256(answer), updatedAt, stale);
+    }
+
+    function deactivatePriceFeed(address token0, address token1)
+        external
+        onlyRole(ORACLE_ADMIN_ROLE)
+    {
+        bytes32 pairHash = keccak256(abi.encodePacked(token0, token1));
+        require(priceFeeds[pairHash].feedAddress != address(0), "Price feed not found");
+
+        priceFeeds[pairHash].isActive = false;
+
+        bytes32 reverseHash = reversePairHash[pairHash];
+        if (reverseHash != bytes32(0)) {
+            priceFeeds[reverseHash].isActive = false;
+        }
+
+        emit PriceFeedDeactivated(pairHash);
     }
 }

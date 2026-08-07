@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 contract StakingVault is Ownable, ReentrancyGuard, Pausable {
     IERC20 public immutable verse;
@@ -36,7 +36,7 @@ contract StakingVault is Ownable, ReentrancyGuard, Pausable {
         emit Staked(msg.sender, amount, block.timestamp);
     }
 
-    function unstake(uint256 amount) external nonReentrant {
+    function unstake(uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, "Invalid amount");
         require(stakedBalance[msg.sender] >= amount, "Insufficient stake");
         require(
