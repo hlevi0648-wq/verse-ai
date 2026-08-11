@@ -54,8 +54,9 @@ export default function BuyPage() {
       if (stripe) {
         await stripe.redirectToCheckout({ mode: "payment", sessionId });
       }
-    } catch (err: any) {
-      setError(err.message || "Something went wrong");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      setError(message);
     } finally {
       setLoading(false);
     }
