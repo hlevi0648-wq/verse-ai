@@ -1,25 +1,72 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { ethers } = require("ethers");
 const cors = require("cors");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 app.use("/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
-app.use(cors());
 
-const pendingOrders = new Map();
+// --- FIX: Restrict CORS to frontend origin ---
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:3000").split(",");
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed"));
+    }
+  },
+}));
+
+// --- FIX: Rate limiting on checkout endpoint ---
+const checkoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many checkout attempts. Please try again later." },
+});
+app.use("/api/create-checkout", checkoutLimiter);
+
+// --- FIX: Persist orders to disk instead of in-memory Map ---
+const ORDERS_FILE = path.join(__dirname, "orders.json");
+
+function loadOrders() {
+  try {
+    if (fs.existsSync(ORDERS_FILE)) {
+      const data = fs.readFileSync(ORDERS_FILE, "utf8");
+      return new Map(Object.entries(JSON.parse(data)));
+    }
+  } catch (err) {
+    console.error("Failed to load orders file:", err.message);
+  }
+  return new Map();
+}
+
+function saveOrders(orders) {
+  try {
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(Object.fromEntries(orders), null, 2));
+  } catch (err) {
+    console.error("Failed to save orders file:", err.message);
+  }
+}
+
+let pendingOrders = loadOrders();
 
 const VERSE_TOKEN_ABI = [
   "function mint(address to, uint256 amount) external",
   "function transfer(address to, uint256 amount) external returns (bool)",
+  "function balanceOf(address account) external view returns (uint256)",
 ];
 
 const VERSE_TOKEN_ADDRESS = process.env.VERSE_TOKEN_ADDRESS || "";
 const TREASURY_PRIVATE_KEY = process.env.TREASURY_PRIVATE_KEY || "";
 const RPC_URL = process.env.SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com";
 
-const PRICE_PER_VERSE_USD = 0.001;
+// --- FIX: Make price configurable via env ---
+const PRICE_PER_VERSE_USD = parseFloat(process.env.PRICE_PER_VERSE_USD || "0.001");
 
 app.post("/api/create-checkout", async (req, res) => {
   try {
@@ -68,6 +115,7 @@ app.post("/api/create-checkout", async (req, res) => {
       status: "pending",
       createdAt: new Date().toISOString(),
     });
+    saveOrders(pendingOrders);
 
     res.json({ sessionId: session.id });
   } catch (err) {
@@ -93,29 +141,49 @@ app.post("/webhook", async (req, res) => {
     const walletAddress = session.metadata.walletAddress;
     const tokenAmount = BigInt(session.metadata.tokenAmount) * BigInt(10 ** 18);
 
-    console.log(`✅ Payment received! Sending ${session.metadata.tokenAmount} VERSE to ${walletAddress}`);
+    // --- FIX: Idempotency — skip if already fulfilled or processing ---
+    const order = pendingOrders.get(session.id);
+    if (order && (order.status === "fulfilled" || order.status === "processing")) {
+      console.log(`Skipping duplicate webhook for ${session.id} (status: ${order.status})`);
+      return res.json({ received: true });
+    }
+
+    if (order) {
+      order.status = "processing";
+      saveOrders(pendingOrders);
+    }
+
+    console.log(`Payment received! Sending ${session.metadata.tokenAmount} VERSE to ${walletAddress}`);
 
     try {
       const provider = new ethers.JsonRpcProvider(RPC_URL);
       const wallet = new ethers.Wallet(TREASURY_PRIVATE_KEY, provider);
       const verseToken = new ethers.Contract(VERSE_TOKEN_ADDRESS, VERSE_TOKEN_ABI, wallet);
 
+      // --- FIX: Check treasury balance before transfer ---
+      const treasuryBalance = await verseToken.balanceOf(wallet.address);
+      if (treasuryBalance < tokenAmount) {
+        throw new Error(
+          `Treasury insufficient: has ${ethers.formatEther(treasuryBalance)}, needs ${ethers.formatEther(tokenAmount)}`
+        );
+      }
+
       const tx = await verseToken.transfer(walletAddress, tokenAmount);
       await tx.wait();
 
-      const order = pendingOrders.get(session.id);
       if (order) {
         order.status = "fulfilled";
         order.txHash = tx.hash;
+        saveOrders(pendingOrders);
       }
 
-      console.log(`✅ Tokens sent! TX: ${tx.hash}`);
+      console.log(`Tokens sent! TX: ${tx.hash}`);
     } catch (err) {
       console.error("Token transfer failed:", err);
-      const order = pendingOrders.get(session.id);
       if (order) {
         order.status = "transfer_failed";
         order.error = err.message;
+        saveOrders(pendingOrders);
       }
     }
   }
@@ -142,7 +210,7 @@ app.get("/api/health", (req, res) => {
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
-  console.log(`🚀 Verse AI payment server running on port ${PORT}`);
-  console.log(`💰 Price: $${PRICE_PER_VERSE_USD} per VERSE`);
-  console.log(`📍 Token address: ${VERSE_TOKEN_ADDRESS}`);
+  console.log(`Verse AI payment server running on port ${PORT}`);
+  console.log(`Price: $${PRICE_PER_VERSE_USD} per VERSE`);
+  console.log(`Token address: ${VERSE_TOKEN_ADDRESS}`);
 });
