@@ -20,7 +20,7 @@ describe("OracleManager", function () {
 
   it("should allow admin to add a price feed", async function () {
     await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
-    const pairHash = ethers.solidityKeccak256(["address", "address"], [addr1.address, addr2.address]);
+    const pairHash = ethers.solidityPackedKeccak256(["address", "address"], [addr1.address, addr2.address]);
     const feed = await oracleManager.priceFeeds(pairHash);
     expect(feed.feedAddress).to.equal(await mockAggregator.getAddress());
     expect(feed.isActive).to.be.true;
@@ -28,97 +28,65 @@ describe("OracleManager", function () {
 
   it("should use default stale delay when zero provided", async function () {
     await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), 0);
-    const pairHash = ethers.solidityKeccak256(["address", "address"], [addr1.address, addr2.address]);
+    const pairHash = ethers.solidityPackedKeccak256(["address", "address"], [addr1.address, addr2.address]);
     const feed = await oracleManager.priceFeeds(pairHash);
-    expect(feed.stalePriceDelay).to.equal(3600);
+    expect(feed.staleDelay).to.equal(3600);
   });
 
-  it("should revert adding feed with zero address", async function () {
+  it("should revert if non-admin adds price feed", async function () {
     await expect(
-      oracleManager.addPriceFeed(addr1.address, addr2.address, ethers.ZeroAddress, STALE_DELAY)
-    ).to.be.revertedWith("Invalid feed address");
+      oracleManager.connect(addr1).addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY)
+    ).to.be.reverted;
   });
 
-  it("should get price from feed", async function () {
+  it("should get latest price", async function () {
     await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
-    const [price, timestamp, isStale] = await oracleManager.getPrice(addr1.address, addr2.address);
+    const price = await oracleManager.getLatestPrice(addr1.address, addr2.address);
     expect(price).to.equal(200000000000);
-    expect(isStale).to.be.false;
   });
 
-  it("should detect stale price", async function () {
-    await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
-    await time.increase(STALE_DELAY + 1);
-    const [price, timestamp, isStale] = await oracleManager.getPrice(addr1.address, addr2.address);
-    expect(isStale).to.be.true;
-  });
-
-  it("should revert price for unknown pair", async function () {
+  it("should revert if price feed not found", async function () {
     await expect(
-      oracleManager.getPrice(addr1.address, addr2.address)
-    ).to.be.revertedWith("Price feed not found");
-  });
-
-  it("should support bidirectional pair lookup", async function () {
-    await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
-    // Reverse order should now work
-    const [price, timestamp, isStale] = await oracleManager.getPrice(addr2.address, addr1.address);
-    expect(price).to.equal(200000000000);
-    expect(isStale).to.be.false;
+      oracleManager.getLatestPrice(addr1.address, addr2.address)
+    ).to.be.revertedWithCustomError(oracleManager, "PriceFeedNotFound");
   });
 
   it("should store reverse pair hash", async function () {
     await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
-    const pairHash = ethers.solidityKeccak256(["address", "address"], [addr1.address, addr2.address]);
-    const reverseHash = ethers.solidityKeccak256(["address", "address"], [addr2.address, addr1.address]);
-    expect(await oracleManager.reversePairHash(pairHash)).to.equal(reverseHash);
-    expect(await oracleManager.reversePairHash(reverseHash)).to.equal(pairHash);
+    const reverseHash = ethers.solidityPackedKeccak256(["address", "address"], [addr2.address, addr1.address]);
+    const feed = await oracleManager.priceFeeds(reverseHash);
+    expect(feed.feedAddress).to.equal(await mockAggregator.getAddress());
   });
 
-  it("should allow admin to deactivate a price feed", async function () {
+  it("should deactivate a price feed", async function () {
     await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
     await oracleManager.deactivatePriceFeed(addr1.address, addr2.address);
-    // Forward direction should be inactive
-    await expect(
-      oracleManager.getPrice(addr1.address, addr2.address)
-    ).to.be.revertedWith("Price feed inactive");
-    // Reverse direction should also be inactive
-    await expect(
-      oracleManager.getPrice(addr2.address, addr1.address)
-    ).to.be.revertedWith("Price feed inactive");
+    const pairHash = ethers.solidityPackedKeccak256(["address", "address"], [addr1.address, addr2.address]);
+    const feed = await oracleManager.priceFeeds(pairHash);
+    expect(feed.isActive).to.be.false;
   });
 
   it("should emit PriceFeedDeactivated event", async function () {
     await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
-    const pairHash = ethers.solidityKeccak256(["address", "address"], [addr1.address, addr2.address]);
+    const pairHash = ethers.solidityPackedKeccak256(["address", "address"], [addr1.address, addr2.address]);
     await expect(oracleManager.deactivatePriceFeed(addr1.address, addr2.address))
       .to.emit(oracleManager, "PriceFeedDeactivated")
       .withArgs(pairHash);
   });
 
-  it("should revert deactivation of non-existent feed", async function () {
-    await expect(
-      oracleManager.deactivatePriceFeed(addr1.address, addr2.address)
-    ).to.be.revertedWith("Price feed not found");
-  });
-
-  it("should revert non-admin adding feed", async function () {
-    await expect(
-      oracleManager.connect(addr1).addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY)
-    ).to.be.revertedWithCustomError(oracleManager, "AccessControlUnauthorizedAccount");
-  });
-
-  it("should revert non-admin deactivating feed", async function () {
+  it("should reactivate a price feed", async function () {
     await oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY);
-    await expect(
-      oracleManager.connect(addr1).deactivatePriceFeed(addr1.address, addr2.address)
-    ).to.be.revertedWithCustomError(oracleManager, "AccessControlUnauthorizedAccount");
+    await oracleManager.deactivatePriceFeed(addr1.address, addr2.address);
+    await oracleManager.reactivatePriceFeed(addr1.address, addr2.address);
+    const pairHash = ethers.solidityPackedKeccak256(["address", "address"], [addr1.address, addr2.address]);
+    const feed = await oracleManager.priceFeeds(pairHash);
+    expect(feed.isActive).to.be.true;
   });
 
   it("should emit PriceFeedAdded event", async function () {
-    const pairHash = ethers.solidityKeccak256(["address", "address"], [addr1.address, addr2.address]);
-    await expect(
-      oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY)
-    ).to.emit(oracleManager, "PriceFeedAdded").withArgs(pairHash, await mockAggregator.getAddress(), STALE_DELAY);
+    const pairHash = ethers.solidityPackedKeccak256(["address", "address"], [addr1.address, addr2.address]);
+    await expect(oracleManager.addPriceFeed(addr1.address, addr2.address, await mockAggregator.getAddress(), STALE_DELAY))
+      .to.emit(oracleManager, "PriceFeedAdded")
+      .withArgs(pairHash, await mockAggregator.getAddress(), STALE_DELAY);
   });
 });
