@@ -1,83 +1,44 @@
 "use client";
-import { useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
 
-const links = [
-  { href: "/", label: "Home" },
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/stake", label: "Stake" },
-  { href: "/strategies", label: "Strategies" },
-];
+import Link from "next/link";
+import { useAccount, useDisconnect } from "wagmi";
 
 export default function Navbar() {
-  const pathname = usePathname();
-  const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
+  const { isConnected, address } = useAccount();
   const { disconnect } = useDisconnect();
-  const [showWallets, setShowWallets] = useState(false);
-
-  const walletOptions = [
-    { connector: connectors.find((c) => c.id === "metaMask" || c.name === "MetaMask"), name: "MetaMask", icon: "🦊", desc: "Browser extension" },
-    { connector: connectors.find((c) => c.id === "trustWallet" || c.name === "Trust Wallet"), name: "Trust Wallet", icon: "🛡️", desc: "Mobile & browser" },
-    { connector: connectors.find((c) => c.id === "walletConnect" || c.name === "WalletConnect"), name: "WalletConnect", icon: "🔗", desc: "Scan QR code" },
-  ].filter((w) => w.connector);
 
   return (
     <nav className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="text-xl font-bold tracking-tight">
-          Verse <span className="text-blue-400">AI</span>
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <Link href="/" className="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+          Verse AI
         </Link>
-        <div className="flex gap-1">
-          {links.map((l) => (
-            <Link key={l.href} href={l.href}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                pathname === l.href ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
-              }`}>{l.label}</Link>
-          ))}
+
+        <div className="flex items-center gap-6">
+          <Link href="/dashboard" className="text-gray-400 hover:text-white transition text-sm">Dashboard</Link>
+          <Link href="/stake" className="text-gray-400 hover:text-white transition text-sm">Stake</Link>
+          <Link href="/strategies" className="text-gray-400 hover:text-white transition text-sm">Strategies</Link>
+          <Link href="/buy" className="text-green-400 hover:text-green-300 transition text-sm font-medium">💳 Buy</Link>
+          <Link href="/withdraw" className="text-yellow-400 hover:text-yellow-300 transition text-sm font-medium">💸 Withdraw</Link>
+
+          {isConnected ? (
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500 font-mono">
+                {address?.slice(0, 6)}...{address?.slice(-4)}
+              </span>
+              <button
+                onClick={() => disconnect()}
+                className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg transition"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <Link href="/connect" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg text-sm font-medium transition">
+              Connect
+            </Link>
+          )}
         </div>
-        {isConnected ? (
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-gray-300 bg-gray-800 px-3 py-1.5 rounded-lg">
-              {address?.slice(0,6)}...{address?.slice(-4)}
-            </span>
-            <button onClick={() => disconnect()}
-              className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg border border-gray-700 hover:border-gray-500 transition">
-              Disconnect
-            </button>
-          </div>
-        ) : (
-          <div className="relative">
-            <button onClick={() => setShowWallets(!showWallets)}
-              className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
-              Connect Wallet
-            </button>
-            {showWallets && (
-              <div className="absolute right-0 top-12 w-72 rounded-xl border border-gray-700 bg-gray-900 shadow-2xl overflow-hidden z-50">
-                <div className="px-4 py-3 border-b border-gray-800">
-                  <p className="text-sm font-semibold">Connect Wallet</p>
-                  <p className="text-xs text-gray-500">Choose your preferred wallet</p>
-                </div>
-                {walletOptions.map((w) => (
-                  <button key={w.name}
-                    onClick={() => { connect({ connector: w.connector! }); setShowWallets(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition text-left">
-                    <span className="text-2xl">{w.icon}</span>
-                    <div>
-                      <p className="text-sm font-medium">{w.name}</p>
-                      <p className="text-xs text-gray-500">{w.desc}</p>
-                    </div>
-                  </button>
-                ))}
-                <div className="px-4 py-2 border-t border-gray-800">
-                  <p className="text-xs text-gray-600 text-center">By connecting, you agree to the Terms of Service</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </nav>
   );

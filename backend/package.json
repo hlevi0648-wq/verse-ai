@@ -1,0 +1,19 @@
+{
+  "name": "verse-ai-payments",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node payment_server.js",
+    "dev": "nodemon payment_server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "stripe": "^17.0.0",
+    "ethers": "^6.13.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}

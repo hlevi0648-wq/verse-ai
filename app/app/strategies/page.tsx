@@ -41,7 +41,7 @@ export default function Strategies() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetch() {
+    async function fetchData() {
       try {
         const [pRes, aRes, rRes] = await Promise.all([
           fetch(`${API}/api/v1/prices`),
@@ -57,8 +57,8 @@ export default function Strategies() {
         setLoading(false);
       }
     }
-    fetch();
-    const interval = setInterval(fetch, 30000);
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -99,67 +99,56 @@ export default function Strategies() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="rounded-xl border border-gray-800 p-6 bg-gray-950">
-          <h2 className="text-lg font-semibold mb-4">Live Prices</h2>
-          <div className="space-y-3">
+      <h2 className="text-xl font-semibold mb-4">Market Prices</h2>
+      <div className="rounded-xl border border-gray-800 overflow-hidden mb-8">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-800 bg-gray-950">
+              <th className="text-left px-4 py-3 text-xs text-gray-500">Token</th>
+              <th className="text-right px-4 py-3 text-xs text-gray-500">Price</th>
+              <th className="text-right px-4 py-3 text-xs text-gray-500">24h Change</th>
+              <th className="text-right px-4 py-3 text-xs text-gray-500">Market Cap</th>
+            </tr>
+          </thead>
+          <tbody>
             {prices.map((p) => (
-              <div key={p.token} className="flex items-center justify-between">
-                <div>
-                  <span className="font-medium">{p.token}</span>
-                  <span className="text-xs text-gray-500 ml-2">{p.name}</span>
-                </div>
-                <div className="text-right">
-                  <span className="font-mono">${p.price_usd?.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
-                  <span className={`ml-2 text-xs ${p.change_24h >= 0 ? "text-green-400" : "text-red-400"}`}>
-                    {p.change_24h >= 0 ? "▲" : "▼"} {Math.abs(p.change_24h).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
+              <tr key={p.token} className="border-b border-gray-800/50">
+                <td className="px-4 py-3 font-medium">{p.name}</td>
+                <td className="px-4 py-3 text-right">${p.price_usd.toLocaleString()}</td>
+                <td className={`px-4 py-3 text-right ${p.change_24h >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {p.change_24h >= 0 ? "+" : ""}{p.change_24h.toFixed(2)}%
+                </td>
+                <td className="px-4 py-3 text-right text-gray-400">${(p.market_cap / 1e6).toFixed(1)}M</td>
+              </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 className="text-xl font-semibold mb-4">AI Recommendations</h2>
+      <div className="space-y-4">
+        {recommendations.map((r, i) => (
+          <div key={i} className="rounded-xl border border-gray-800 p-6 bg-gray-950">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold">{r.strategy_name}</h3>
+              <span className={`text-sm px-3 py-1 rounded-full ${r.action === "buy" ? "bg-green-900/30 text-green-400" : r.action === "sell" ? "bg-red-900/30 text-red-400" : "bg-gray-800 text-gray-400"}`}>
+                {r.action.toUpperCase()}
+              </span>
+            </div>
+            <p className="text-gray-400 text-sm mb-3">{r.reason}</p>
+            <div className="flex gap-6 text-sm">
+              <span className="text-gray-500">Allocation: <span className="text-white">{r.allocation_percent}%</span></span>
+              <span className="text-gray-500">Confidence: <span className="text-white">{r.confidence}%</span></span>
+            </div>
           </div>
-        </div>
-
-        <div className="rounded-xl border border-gray-800 p-6 bg-gray-950">
-          <h2 className="text-lg font-semibold mb-4">AI Recommendations</h2>
-          {recommendations.length === 0 ? (
-            <p className="text-gray-500 text-sm">No strategies deployed yet. Deploy contracts to get recommendations.</p>
-          ) : (
-            <div className="space-y-3">
-              {recommendations.map((r) => (
-                <div key={r.strategy_name} className="flex items-center justify-between p-3 rounded-lg bg-gray-900">
-                  <div>
-                    <p className="text-sm font-medium">{r.strategy_name}</p>
-                    <p className="text-xs text-gray-500">{r.reason}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-xs font-medium px-2 py-1 rounded ${
-                      r.action === "increase" ? "bg-green-900 text-green-300" :
-                      r.action === "reduce" ? "bg-red-900 text-red-300" :
-                      "bg-gray-700 text-gray-300"
-                    }`}>{r.action.toUpperCase()}</span>
-                    <p className="text-xs text-gray-500 mt-1">{r.allocation_percent.toFixed(1)}%</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        ))}
       </div>
 
-      <div className="rounded-xl border border-gray-800 p-6 bg-gray-950">
-        <h2 className="text-lg font-semibold mb-4">Chainlink Oracle Prices</h2>
-        <p className="text-xs text-gray-500 mb-3">On-chain price feeds from Chainlink oracles (Sepolia)</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {["ETH/USD", "BTC/USD", "LINK/USD", "USDC/USD"].map((pair) => (
-            <div key={pair} className="rounded-lg bg-gray-900 p-3">
-              <p className="text-xs text-gray-500">{pair}</p>
-              <p className="text-sm font-mono font-medium">—</p>
-              <p className="text-xs text-gray-600">On-chain</p>
-            </div>
-          ))}
+      {!isConnected && (
+        <div className="mt-8 rounded-xl border border-gray-800 p-6 bg-gray-950 text-center">
+          <p className="text-gray-400 mb-4">Connect your wallet to execute strategies</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }

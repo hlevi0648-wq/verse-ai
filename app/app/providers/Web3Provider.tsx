@@ -9,13 +9,7 @@ const projectId = "verse-ai-walletconnect";
 const config = createConfig({
   chains: [sepolia],
   connectors: [
-    injected({
-      target: {
-        id: "metaMask",
-        name: "MetaMask",
-        provider: (window: any) => window?.ethereum?.providers?.find((p: any) => p.isMetaMask) || window?.ethereum,
-      },
-    }),
+    injected(),
     walletConnect({
       projectId,
       showQrModal: true,
@@ -24,13 +18,6 @@ const config = createConfig({
         description: "AI-powered DeFi strategies",
         url: "https://verse-ai-levis-production.vercel.app",
         icons: ["https://verse-ai-levis-production.vercel.app/favicon.ico"],
-      },
-    }),
-    injected({
-      target: {
-        id: "trustWallet",
-        name: "Trust Wallet",
-        provider: (window: any) => window?.trustwallet || window?.ethereum?.providers?.find((p: any) => p.isTrust),
       },
     }),
   ],
