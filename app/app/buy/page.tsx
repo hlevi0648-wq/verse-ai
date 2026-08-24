@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useAccount } from "wagmi";
-import { loadStripe, Stripe } from "@stripe/stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+import type { Stripe } from "@stripe/stripe-js";
 
 const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -51,10 +52,11 @@ export default function BuyPage() {
 
       const stripe: Stripe | null = await loadStripe(STRIPE_PK);
       if (stripe) {
-        await stripe.redirectToCheckout({ sessionId });
+        await stripe.redirectToCheckout({ mode: "payment", sessionId });
       }
-    } catch (err: any) {
-      setError(err.message || "Something went wrong");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      setError(message);
     } finally {
       setLoading(false);
     }
