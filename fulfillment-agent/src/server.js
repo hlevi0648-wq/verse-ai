@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import express from "express";
 import Stripe from "stripe";
 import { hasProcessedEvent, recordEvent } from "./lib/order-state.js";
-import { syncOrder } from "./src/routes/orders.js";
+import { syncOrder } from "./routes/orders.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
