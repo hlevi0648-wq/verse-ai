@@ -4,6 +4,7 @@ import express from "express";
 import Stripe from "stripe";
 import { hasProcessedEvent, recordEvent } from "./lib/order-state.js";
 import { syncOrder } from "./routes/orders.js";
+import { processFulfillment } from "./routes/fulfillment.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -173,11 +174,7 @@ app.post("/api/invoices/create", (_req, res) => {
   });
 });
 
-app.post("/api/fulfillment/process", (_req, res) => {
-  res.status(501).json({
-    error: "Fulfillment processing not configured yet"
-  });
-});
+app.post("/api/fulfillment/process", processFulfillment);
 
 app.listen(port, () => {
   console.log(`Verse AI fulfillment agent listening on ${port}`);
