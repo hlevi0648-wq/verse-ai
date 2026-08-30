@@ -1,9 +1,14 @@
 import "dotenv/config";
 import crypto from "node:crypto";
 import express from "express";
+import Stripe from "stripe";
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  : null;
 
 function verifyShopifySignature(req) {
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
@@ -16,10 +21,10 @@ function verifyShopifySignature(req) {
     .update(req.rawBody)
     .digest("base64");
 
-  return crypto.timingSafeEqual(
-    Buffer.from(digest),
-    Buffer.from(signature)
-  );
+  const a = Buffer.from(digest);
+  const b = Buffer.from(signature);
+
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 app.use(
@@ -39,33 +44,111 @@ app.get("/health", (_req, res) => {
 
 app.post("/api/webhooks/shopify", (req, res) => {
   if (!verifyShopifySignature(req)) {
-    return res.status(401).json({ error: "Invalid Shopify signature" });
+    return res.status(401).json({
+      error: "Invalid Shopify signature"
+    });
   }
 
   console.log("Verified Shopify webhook");
-  return res.status(202).json({ accepted: true });
-});
 
-app.post("/api/webhooks/stripe", (_req, res) => {
-  return res.status(501).json({
-    error: "Stripe signature verification not configured yet"
+  return res.status(202).json({
+    accepted: true
   });
 });
 
-app.post("/api/orders/sync", (_req, res) => {
-  res.status(501).json({ error: "Not configured" });
+app.post("/api/webhooks/stripe", async (req, res) => {
+  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return res.status(503).json({
+      error: "Stripe webhook configuration is missing"
+    });
+  }
+
+  const signature = req.get("Stripe-Signature");
+
+  if (!signature || !req.rawBody) {
+    return res.status(400).json({
+      error: "Missing Stripe signature"
+    });
+  }
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.rawBody,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (error) {
+    console.error("Stripe signature verification failed");
+    return res.status(400).json({
+      error: "Invalid Stripe webhook signature"
+    });
+  }
+
+  console.log(`Verified Stripe event: ${event.type}`);
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+
+    console.log("Checkout completed:", session.id);
+
+    // Fulfillment should only continue after authoritative
+    // payment verification in the next stage.
+  }
+
+  return res.status(200).json({
+    received: true
+  });
 });
 
-app.post("/api/payments/verify", (_req, res) => {
-  res.status(501).json({ error: "Not configured" });
+app.post("/api/payments/verify", async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({
+      error: "Stripe is not configured"
+    });
+  }
+
+  const { paymentIntentId } = req.body;
+
+  if (!paymentIntentId) {
+    return res.status(400).json({
+      error: "paymentIntentId is required"
+    });
+  }
+
+  try {
+    const paymentIntent =
+      await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    return res.json({
+      id: paymentIntent.id,
+      status: paymentIntent.status,
+      paid: paymentIntent.status === "succeeded"
+    });
+  } catch {
+    return res.status(404).json({
+      error: "Payment could not be verified"
+    });
+  }
+});
+
+app.post("/api/orders/sync", (_req, res) => {
+  res.status(501).json({
+    error: "Shopify order synchronization not configured yet"
+  });
 });
 
 app.post("/api/invoices/create", (_req, res) => {
-  res.status(501).json({ error: "Not configured" });
+  res.status(501).json({
+    error: "Invoice creation not configured yet"
+  });
 });
 
 app.post("/api/fulfillment/process", (_req, res) => {
-  res.status(501).json({ error: "Not configured" });
+  res.status(501).json({
+    error: "Fulfillment processing not configured yet"
+  });
 });
 
 app.listen(port, () => {
