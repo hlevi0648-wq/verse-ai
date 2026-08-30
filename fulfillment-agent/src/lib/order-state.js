@@ -1,28 +1,41 @@
 import { createClient } from "@supabase/supabase-js";
 
-const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let supabase = null;
 
-if (!url || !key) {
-  throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+function getSupabase() {
+  if (supabase) return supabase;
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  }
+
+  supabase = createClient(url, key);
+  return supabase;
 }
 
-const supabase = createClient(url, key);
-
 export async function hasProcessedEvent(eventId) {
-  const { data, error } = await supabase
+  if (!eventId) return false;
+
+  const client = getSupabase();
+  const { data, error } = await client
     .from("fulfillment_events")
     .select("id")
     .eq("event_id", eventId)
     .maybeSingle();
 
   if (error) throw error;
-
   return Boolean(data);
 }
 
 export async function recordEvent(eventId, data = {}) {
-  const { error } = await supabase
+  if (!eventId) return;
+
+  const client = getSupabase();
+
+  const { error } = await client
     .from("fulfillment_events")
     .insert({
       event_id: eventId,
