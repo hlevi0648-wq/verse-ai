@@ -178,6 +178,4 @@ app.post("/api/invoices/create", (_req, res) => {
 
 app.post("/api/fulfillment/process", processFulfillment);
 
-app.listen(port, () => {
-  console.log(`Verse AI fulfillment agent listening on ${port}`);
-});
+export default app;
