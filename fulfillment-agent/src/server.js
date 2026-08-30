@@ -2,6 +2,7 @@ import "dotenv/config";
 import crypto from "node:crypto";
 import express from "express";
 import Stripe from "stripe";
+import { hasProcessedEvent, recordEvent } from "./lib/order-state.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -49,6 +50,24 @@ app.post("/api/webhooks/shopify", (req, res) => {
     });
   }
 
+  const eventId =
+    req.get("X-Shopify-Webhook-Id") ||
+    req.get("X-Request-ID");
+
+  if (eventId && hasProcessedEvent(eventId)) {
+    return res.status(200).json({
+      accepted: true,
+      duplicate: true
+    });
+  }
+
+  if (eventId) {
+    recordEvent(eventId, {
+      provider: "shopify",
+      topic: req.get("X-Shopify-Topic") || "unknown"
+    });
+  }
+
   console.log("Verified Shopify webhook");
 
   return res.status(202).json({
@@ -87,6 +106,18 @@ app.post("/api/webhooks/stripe", async (req, res) => {
   }
 
   console.log(`Verified Stripe event: ${event.type}`);
+
+  if (hasProcessedEvent(event.id)) {
+    return res.status(200).json({
+      received: true,
+      duplicate: true
+    });
+  }
+
+  recordEvent(event.id, {
+    provider: "stripe",
+    type: event.type
+  });
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
