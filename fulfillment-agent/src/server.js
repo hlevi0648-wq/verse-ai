@@ -43,7 +43,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.post("/api/webhooks/shopify", (req, res) => {
+app.post("/api/webhooks/shopify", async (req, res) => {
   if (!verifyShopifySignature(req)) {
     return res.status(401).json({
       error: "Invalid Shopify signature"
@@ -54,7 +54,7 @@ app.post("/api/webhooks/shopify", (req, res) => {
     req.get("X-Shopify-Webhook-Id") ||
     req.get("X-Request-ID");
 
-  if (eventId && hasProcessedEvent(eventId)) {
+  if (eventId && await hasProcessedEvent(eventId)) {
     return res.status(200).json({
       accepted: true,
       duplicate: true
@@ -62,7 +62,7 @@ app.post("/api/webhooks/shopify", (req, res) => {
   }
 
   if (eventId) {
-    recordEvent(eventId, {
+    await recordEvent(eventId, {
       provider: "shopify",
       topic: req.get("X-Shopify-Topic") || "unknown"
     });
@@ -107,14 +107,14 @@ app.post("/api/webhooks/stripe", async (req, res) => {
 
   console.log(`Verified Stripe event: ${event.type}`);
 
-  if (hasProcessedEvent(event.id)) {
+  if (await hasProcessedEvent(event.id)) {
     return res.status(200).json({
       received: true,
       duplicate: true
     });
   }
 
-  recordEvent(event.id, {
+  await recordEvent(event.id, {
     provider: "stripe",
     type: event.type
   });
