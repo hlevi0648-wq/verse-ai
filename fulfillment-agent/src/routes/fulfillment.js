@@ -1,4 +1,5 @@
 import { getOrder } from "../lib/shopify.js";
+import { verifyPayment } from "../lib/stripe.js";
 
 export async function processFulfillment(req, res) {
   const { orderId, paymentIntentId } = req.body;
@@ -25,9 +26,19 @@ export async function processFulfillment(req, res) {
       });
     }
 
+    const payment = await verifyPayment(paymentIntentId);
+
+    if (!payment.paid) {
+      return res.status(409).json({
+        error: "Stripe payment is not successful",
+        paymentStatus: payment.status
+      });
+    }
+
     return res.status(202).json({
       accepted: true,
       orderId: order.id,
+      paymentId: payment.id,
       fulfillment: "payment_verified"
     });
   } catch (error) {
