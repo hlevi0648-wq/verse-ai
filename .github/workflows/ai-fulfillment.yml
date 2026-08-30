@@ -1,0 +1,19 @@
+name: Verse AI Fulfillment
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate fulfillment configuration
+        run: |
+          python -m json.tool workflows/ai-fulfillment-workflow.json > /dev/null
+          echo "Verse AI fulfillment configuration is valid."

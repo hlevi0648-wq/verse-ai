@@ -1,0 +1,23 @@
+{
+  "name": "Verse AI Fulfillment",
+  "version": "1.0",
+  "flow": [
+    "shopify_webhook",
+    "verify_webhook_signature",
+    "deduplicate_event",
+    "fetch_authoritative_order",
+    "verify_payment",
+    "create_invoice",
+    "generate_ai_order_summary",
+    "queue_fulfillment",
+    "notify_customer"
+  ],
+  "endpoints": [
+    "/api/webhooks/shopify",
+    "/api/webhooks/stripe",
+    "/api/orders/sync",
+    "/api/payments/verify",
+    "/api/invoices/create",
+    "/api/fulfillment/process"
+  ]
+}
