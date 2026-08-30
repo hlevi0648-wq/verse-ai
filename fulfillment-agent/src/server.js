@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import express from "express";
 import Stripe from "stripe";
 import { hasProcessedEvent, recordEvent } from "./lib/order-state.js";
+import { syncOrder } from "./src/routes/orders.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -164,11 +165,7 @@ app.post("/api/payments/verify", async (req, res) => {
   }
 });
 
-app.post("/api/orders/sync", (_req, res) => {
-  res.status(501).json({
-    error: "Shopify order synchronization not configured yet"
-  });
-});
+app.post("/api/orders/sync", syncOrder);
 
 app.post("/api/invoices/create", (_req, res) => {
   res.status(501).json({
