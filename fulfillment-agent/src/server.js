@@ -1,9 +1,34 @@
+import "dotenv/config";
+import crypto from "node:crypto";
 import express from "express";
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json());
+function verifyShopifySignature(req) {
+  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  const signature = req.get("X-Shopify-Hmac-Sha256");
+
+  if (!secret || !signature || !req.rawBody) return false;
+
+  const digest = crypto
+    .createHmac("sha256", secret)
+    .update(req.rawBody)
+    .digest("base64");
+
+  return crypto.timingSafeEqual(
+    Buffer.from(digest),
+    Buffer.from(signature)
+  );
+}
+
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = Buffer.from(buf);
+    }
+  })
+);
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -13,43 +38,34 @@ app.get("/health", (_req, res) => {
 });
 
 app.post("/api/webhooks/shopify", (req, res) => {
-  console.log("Shopify webhook received");
-  res.status(202).json({
-    accepted: true,
-    provider: "shopify"
-  });
+  if (!verifyShopifySignature(req)) {
+    return res.status(401).json({ error: "Invalid Shopify signature" });
+  }
+
+  console.log("Verified Shopify webhook");
+  return res.status(202).json({ accepted: true });
 });
 
-app.post("/api/webhooks/stripe", (req, res) => {
-  console.log("Stripe webhook received");
-  res.status(202).json({
-    accepted: true,
-    provider: "stripe"
+app.post("/api/webhooks/stripe", (_req, res) => {
+  return res.status(501).json({
+    error: "Stripe signature verification not configured yet"
   });
 });
 
 app.post("/api/orders/sync", (_req, res) => {
-  res.status(501).json({
-    error: "Order synchronization not configured yet"
-  });
+  res.status(501).json({ error: "Not configured" });
 });
 
 app.post("/api/payments/verify", (_req, res) => {
-  res.status(501).json({
-    error: "Payment verification not configured yet"
-  });
+  res.status(501).json({ error: "Not configured" });
 });
 
 app.post("/api/invoices/create", (_req, res) => {
-  res.status(501).json({
-    error: "Invoice provider not configured yet"
-  });
+  res.status(501).json({ error: "Not configured" });
 });
 
 app.post("/api/fulfillment/process", (_req, res) => {
-  res.status(501).json({
-    error: "Fulfillment provider not configured yet"
-  });
+  res.status(501).json({ error: "Not configured" });
 });
 
 app.listen(port, () => {
