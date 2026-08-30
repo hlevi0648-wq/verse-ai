@@ -5,6 +5,7 @@ import Stripe from "stripe";
 import { hasProcessedEvent, recordEvent } from "./lib/order-state.js";
 import { syncOrder } from "./routes/orders.js";
 import { processFulfillment } from "./routes/fulfillment.js";
+import { createCheckout } from "./routes/checkout.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -167,6 +168,7 @@ app.post("/api/payments/verify", async (req, res) => {
 });
 
 app.post("/api/orders/sync", syncOrder);
+app.post("/api/checkout_sessions", createCheckout);
 
 app.post("/api/invoices/create", (_req, res) => {
   res.status(501).json({
