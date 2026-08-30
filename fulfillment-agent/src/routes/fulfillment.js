@@ -1,5 +1,5 @@
 import { getOrder } from "../lib/shopify.js";
-import { verifyPayment } from "../lib/stripe.js";
+import { verifyPayment, paymentMatchesOrder } from "../lib/stripe.js";
 
 export async function processFulfillment(req, res) {
   const { orderId, paymentIntentId } = req.body;
@@ -32,6 +32,12 @@ export async function processFulfillment(req, res) {
       return res.status(409).json({
         error: "Stripe payment is not successful",
         paymentStatus: payment.status
+      });
+    }
+
+    if (!paymentMatchesOrder(payment, order)) {
+      return res.status(409).json({
+        error: "Stripe payment does not match Shopify order"
       });
     }
 
